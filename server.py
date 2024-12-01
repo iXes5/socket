@@ -8,7 +8,7 @@ FORMAT = "utf8"
 
 # Biến đếm số lượng client đang kết nối
 active_clients = 0
-lock = threading.Lock()  # Đảm bảo đồng bộ hóa khi thay đổi biến đếm
+lock = threading.Lock()
 
 def handleClient(conn: socket, addr):
     global active_clients
@@ -24,7 +24,6 @@ def handleClient(conn: socket, addr):
     print(addr, "finished")
     print(conn.getsockname(), "closed")
     
-    # Giảm số lượng client khi client ngắt kết nối
     with lock:
         active_clients -= 1
     conn.close()
