@@ -53,5 +53,5 @@ while active_clients < 5:
     except Exception as e:
         print(f"Error: {e}")
 
-print("No more clients connected. Shutting down the server.")
+print("end")
 s.close()
