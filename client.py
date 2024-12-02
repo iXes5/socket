@@ -2,7 +2,6 @@ import os
 import socket
 import threading
 import tkinter as tk
-import pandas as pd
 from tkinter import *
 from tkinter import filedialog, simpledialog, ttk
 
@@ -216,27 +215,25 @@ def main():
 
     root = Tk()
     root.title("File Transfer Application")
-    root.geometry("300x250+300+300")
+    root.geometry("410x300+500+150")
     root.configure(bg = "linen")
     root.resizable(False, False)
 
-#App icon
-image_icon = PhotoImage(file = "")
-root.iconphoto(False, image_icon)
+    # app icon
+    image_icon = PhotoImage(file = "image/transfer.png")
+    root.iconphoto(False, image_icon)
 
-#upload button
-upload_image = PhotoImage(file = "")
-upload = Button(root, image = upload_image, bg = "linen", bd = 0, command = select_file_to_upload)
-upload.place(x = 50, y = 50)
-Label(root, text = "upload", font = ('arial', 16, 'bold'), bg = 'linen').place(x = 50, y = 50)
+    # upload button
+    upload_image = PhotoImage(file = "image/upload.png")
+    upload = Button(root, image = upload_image, bg = "linen", bd = 0, command = select_file_to_upload)
+    upload.place(x = 50, y = 50)
 
-# download button
-download_image = PhotoImage(file = "")
-download = Button(root, image = download_image, bg = "linen", bd = 0, command = select_file_to_download)
-download.place(x = 185, y = 50)
-Label(root, text = "download", font = ('arial', 16, 'bold'), bg = 'linen').place(x = 185, y = 50)
+    # download button
+    download_image = PhotoImage(file = "image/download.png")
+    download = Button(root, image = download_image, bg = "linen", bd = 0, command = select_file_to_download)
+    download.place(x = 228, y = 50)
 
-root.mainloop()
+    root.mainloop()
 
 if __name__ == "__main__":
     main()

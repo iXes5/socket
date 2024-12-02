@@ -5,7 +5,7 @@ import threading
 HOST ='localhost'
 PORT = 9999
 CHUNK_SIZE = 1024*1024
-DATA_FOLDER = 'Server_data'
+DATA_FOLDER = 'server_data'
 socket_lock = threading.Lock()
 
 
@@ -182,7 +182,7 @@ def split_file(file_path, chunk_size):
             chunk = file.read(chunk_size)
             if not chunk:
                 break
-            chunk_filename = f"{file_path}_part_{len(chunk)}"
+            chunk_filename = f"{file_path}_part_{len(chunks)}"
             with open(chunk_filename, 'wb') as chunk_file:
                 chunk_file.write(chunk)
             
