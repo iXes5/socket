@@ -2,9 +2,9 @@ import os
 import socket
 import threading
 
-HOST ='localhost'
+HOST ='127.0.0.1'
 PORT = 9999
-CHUNK_SIZE = 1024*1024
+CHUNK_SIZE = 1024*64
 DATA_FOLDER = 'server_data'
 socket_lock = threading.Lock()
 
@@ -26,7 +26,7 @@ def handle_client(conn, addr):
 
         elif request_type == 'download':
             file_name = file_info.strip()
-            print(f"File download's name: {file_name},")
+            print(f"File download's name: {file_name}")
             handle_download(conn, file_name)
 
         else:
@@ -80,7 +80,7 @@ def receive_chunk(conn, socket_lock, chunk_paths, file_name, num_chunks):
                 chunk_data += conn.recv(min(1024, chunk_size - len(chunk_data)))
 
             # Save the chunk data to a file
-            chunk_path = os.path.join(DATA_FOLDER, f"{file_name}_chunk_{chunk_data}")
+            chunk_path = os.path.join(DATA_FOLDER, f"{file_name}_chunk_{chunk_index}")
             with open(chunk_path, 'wb') as chunk_file:
                 chunk_file.write(chunk_data)
             
@@ -159,7 +159,7 @@ def receive_request_type_and_file_info(conn):
 
     if data.startswith('upload'):
         return 'upload', data[len('upload'):]
-    elif data.startswith('upload'):
+    elif data.startswith('download'):
         return 'download', data[len('download'):]
     else:
         return None, None
@@ -175,19 +175,27 @@ def ensure_unique_filename(file_path):
 
     return unique_file_path
 
+import os
+
 def split_file(file_path, chunk_size):
     chunks = []
+    base_name = os.path.basename(file_path)
+    dir_name = os.path.dirname(file_path)
+    
     with open(file_path, 'rb') as file:
+        index = 0
         while True:
             chunk = file.read(chunk_size)
             if not chunk:
                 break
-            chunk_filename = f"{file_path}_part_{len(chunks)}"
+            chunk_filename = os.path.join(dir_name, f"{base_name}_part_{index}")
             with open(chunk_filename, 'wb') as chunk_file:
                 chunk_file.write(chunk)
             
             chunks.append(chunk_filename)
+            index += 1
     return chunks
+
 
 def merge_chunks(chunks, output_file):
     with open(output_file, 'wb') as out_file:

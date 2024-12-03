@@ -6,11 +6,31 @@ from tkinter import *
 from tkinter import filedialog, simpledialog, ttk
 
 # CONSTANTS
-HOST ='localhost'
+HOST ='127.0.0.1'
 PORT = 9999
-CHUNK_SIZE = 1024*1024
-UPLOAD_FOLDER = 'Server_data'
+CHUNK_SIZE = 1024*64
+UPLOAD_FOLDER = 'server_data'
 socket_lock = threading.Lock()
+
+def split_file(file_path, chunk_size):
+    chunks = []
+    with open(file_path, 'rb') as file:
+        while True:
+            chunk = file.read(chunk_size)
+            if not chunk:
+                break
+            chunk_filename = f"{file_path}_part_{len(chunks)}"
+            with open(chunk_filename, 'wb') as chunk_file:
+                chunk_file.write(chunk)
+            chunks.append(chunk_filename)
+    return chunks
+
+def merge_chunks(chunks, output_file):
+    with open(output_file, 'wb') as out_file:
+        for chunk_file in chunks:
+            with open(chunk_file,'rb') as chunk:
+                out_file.write(chunk.read())
+            os.remove(chunk_file)
 
 #UPLOAD
 def upload_file(file_path):
@@ -26,6 +46,7 @@ def upload_file(file_path):
             client_socket.connect((HOST,PORT))
             #send the request type
             client_socket.sendall('upload'.encode())
+            print(f"Send request to server: upload")
 
             #Send the file info
             file_info =f"{os.path.basename(file_path)}:{num_chunks}"
@@ -66,7 +87,7 @@ def upload_chunk(chunk_index, chunk_path, client_socket, socket_lock):
         #synchronize access to the socket
         with socket_lock:
             #send chunk index and size
-            client_socket.sendall(f"{chunk_index}:{os.path.getsize(chunk_path)}")
+            client_socket.sendall(f"{chunk_index}:{os.path.getsize(chunk_path)}".encode())
             # ACK for chunk index and size 
             ack = client_socket.recv(1024).decode().strip()
             if ack != "OK":
@@ -97,12 +118,12 @@ def download_file(file_path):
 
             #send the request type
             client_socket.sendall("download".encode())
-            print(f"Send request to server: {"download".encode()}")
+            print(f"Send request to server: download")
 
             #Send the file name
             client_socket.sendall(file_path.encode())
-            print(f"Send filename to server: {file_path.encode()}")
-            #ACK for recrving file name
+            print(f"Send filename to server: {file_path}")
+            #ACK for receiving file name
             ack = client_socket.recv(1024).decode().strip()
             if ack != "OK":
                 raise Exception("Failed to receive acknowledgment from server")
@@ -187,27 +208,6 @@ def select_file_to_download():
             print(f"File selected: {file_path}")
         else:
             print("No file selected to download.")
-
-def split_file(file_path, chunk_size):
-    chunks = []
-    with open(file_path, 'rb') as file:
-        while True:
-            chunk = file.read(chunk_size)
-            if not chunk:
-                break
-            chunk_filename = f"{file_path}_part_{len(chunks)}"
-            with open(chunk_filename, 'wb') as chunk_file:
-                chunk_file.write(chunk)
-            chunks.append(chunk_filename)
-    return chunks
-
-def merge_chunks(chunks, output_file):
-    with open(output_file, 'wb') as out_file:
-        for chunk_file in chunks:
-            with open(chunk_file,'rb') as chunk:
-                out_file.write(chunk.read())
-            os.remove(chunk_file)
-
 
 def main():
     #Initialize the Tkinter root window
