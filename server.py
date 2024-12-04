@@ -2,13 +2,42 @@ import os
 import socket
 import threading
 
+# IP loopback (use for test)
 HOST ='127.0.0.1'
-PORT = 9999
+PORT = 55555
 CHUNK_SIZE = 1024*64
 DATA_FOLDER = 'server_data'
 socket_lock = threading.Lock()
 
+# Split file into chunks
+def split_file(file_path, chunk_size):
+    chunks = []
+    base_name = os.path.basename(file_path)
+    dir_name = os.path.dirname(file_path)
+    
+    with open(file_path, 'rb') as file:
+        index = 0
+        while True:
+            chunk = file.read(chunk_size)
+            if not chunk:
+                break
+            chunk_filename = os.path.join(dir_name, f"{base_name}_part_{index}")
+            with open(chunk_filename, 'wb') as chunk_file:
+                chunk_file.write(chunk)
+            
+            chunks.append(chunk_filename)
+            index += 1
+    return chunks
 
+# Merge all chunks into one file
+def merge_chunks(chunks, output_file):
+    with open(output_file, 'wb') as out_file:
+        for chunk_file in chunks:
+            with open(chunk_file, 'rb') as chunk:
+                out_file.write(chunk.read())
+            os.remove(chunk_file)
+
+# Accept connect from client and do the request
 def handle_client(conn, addr):
     print(f"Connected by {addr}")
     try:
@@ -42,6 +71,7 @@ def handle_client(conn, addr):
     finally:
         conn.close()
 
+# Handle upload request
 def handle_upload(conn, file_name, num_chunks):
     try:
         chunk_paths = [None] * num_chunks
@@ -71,6 +101,7 @@ def receive_chunk(conn, socket_lock, chunk_paths, file_name, num_chunks):
             # Receive chunk info
             chunk_info = conn.recv(1024).decode().strip()
             chunk_index, chunk_size = map(int, chunk_info.split(':'))
+
             # ACK for sendall
             conn.sendall("OK".encode())
 
@@ -93,6 +124,7 @@ def receive_chunk(conn, socket_lock, chunk_paths, file_name, num_chunks):
     except Exception as E:
         print(f"Error receiving chunk: {E}")
 
+# Handle download request
 def handle_download(conn, file_name):
     try:
         # Get file path
@@ -163,46 +195,19 @@ def receive_request_type_and_file_info(conn):
         return 'download', data[len('download'):]
     else:
         return None, None
-    
+
+# Make sure file name not duplicate
 def ensure_unique_filename(file_path):
     base, ext = os.path.splitext(file_path)
     counter = 1
     unique_file_path = file_path
 
+    # If duplicate, add a number to the end of file name
     while os.path.exists(unique_file_path):
         unique_file_path = f"{base}_{counter}{ext}"
         counter += 1
 
     return unique_file_path
-
-import os
-
-def split_file(file_path, chunk_size):
-    chunks = []
-    base_name = os.path.basename(file_path)
-    dir_name = os.path.dirname(file_path)
-    
-    with open(file_path, 'rb') as file:
-        index = 0
-        while True:
-            chunk = file.read(chunk_size)
-            if not chunk:
-                break
-            chunk_filename = os.path.join(dir_name, f"{base_name}_part_{index}")
-            with open(chunk_filename, 'wb') as chunk_file:
-                chunk_file.write(chunk)
-            
-            chunks.append(chunk_filename)
-            index += 1
-    return chunks
-
-
-def merge_chunks(chunks, output_file):
-    with open(output_file, 'wb') as out_file:
-        for chunk_file in chunks:
-            with open(chunk_file, 'rb') as chunk:
-                out_file.write(chunk.read())
-            os.remove(chunk_file)
 
 def start_server():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
@@ -211,6 +216,7 @@ def start_server():
         server_socket.listen()
         print(f"Server started: {HOST} {PORT}")
 
+        # Accept the request from multiple client
         while True:
             conn, addr = server_socket.accept()
             print(f"Client {addr[0]}:{addr[1]}")

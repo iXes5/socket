@@ -1,17 +1,23 @@
 import os
 import socket
 import threading
+# GUI
 import tkinter as tk
-from tkinter import *
-from tkinter import filedialog, simpledialog, ttk
+from tkinter import Tk
+from tkinter import filedialog
+from tkinter import simpledialog
+from tkinter import PhotoImage 
+from tkinter import Button
+from tkinter import messagebox
 
-# CONSTANTS
+# IP loopback (use for test)
 HOST ='127.0.0.1'
-PORT = 9999
+PORT = 55555
 CHUNK_SIZE = 1024*64
 UPLOAD_FOLDER = 'server_data'
 socket_lock = threading.Lock()
 
+# Split file into chunks
 def split_file(file_path, chunk_size):
     chunks = []
     with open(file_path, 'rb') as file:
@@ -25,6 +31,8 @@ def split_file(file_path, chunk_size):
             chunks.append(chunk_filename)
     return chunks
 
+
+# Merge all chunks into one file
 def merge_chunks(chunks, output_file):
     with open(output_file, 'wb') as out_file:
         for chunk_file in chunks:
@@ -32,43 +40,43 @@ def merge_chunks(chunks, output_file):
                 out_file.write(chunk.read())
             os.remove(chunk_file)
 
-#UPLOAD
+# UPLOAD
 def upload_file(file_path):
     try:
-        #split the file into chunks
+        # Split the file into chunks
         chunks = split_file(file_path, CHUNK_SIZE)
         num_chunks = len(chunks)
         print(f"Num of chunks: {num_chunks}")
 
-        #Create a socket for the client
+        # Create a socket for the client
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
-            #COnnect to the server
+            # Connect to the server
             client_socket.connect((HOST,PORT))
-            #send the request type
+            # Send the request type
             client_socket.sendall('upload'.encode())
             print(f"Send request to server: upload")
 
-            #Send the file info
+            # Send the file info
             file_info =f"{os.path.basename(file_path)}:{num_chunks}"
             client_socket.sendall(file_info.encode())
-            #ACK for receving file info
+            # ACK for receving file info
             ack = client_socket.recv(1024).decode().strip()
             if ack != 'OK':
                 raise Exception("Failed to receive acknowledgment from server")
             
-            #Create threads to upload each chunk
+            # Create threads to upload each chunk
             threads = []
-            #Start threads
+            # Start threads
             for index, chunk_path in enumerate(chunks):
                 thread = threading.Thread(target=upload_chunk, args=(index, chunk_path, client_socket, socket_lock))
                 threads.append(thread)
                 thread.start()
 
-            #Wait for all threads finish
+            # Wait for all threads finish
             for thread in threads:
                 thread.join()
 
-            #Final ACK
+            # Final ACK
             ack = client_socket.recv(1024).decode().strip()
             if ack != "OK":
                 raise Exception("Failed to receive acknowledgment from server")
@@ -77,28 +85,28 @@ def upload_file(file_path):
     except Exception as e:
         print(f"Error uploading file {file_path}: {e}")
     finally:
-        #Clean up chunk file
+        # Clean up chunk file
         for chunk in chunks:
             if(os.path.exists(chunk)):
                 os.remove(chunk)
 
 def upload_chunk(chunk_index, chunk_path, client_socket, socket_lock):
     try:
-        #synchronize access to the socket
+        # Synchronize access to the socket
         with socket_lock:
-            #send chunk index and size
+            # Send chunk index and size
             client_socket.sendall(f"{chunk_index}:{os.path.getsize(chunk_path)}".encode())
             # ACK for chunk index and size 
             ack = client_socket.recv(1024).decode().strip()
             if ack != "OK":
                 raise Exception("Failed to receive acknowledgment from server")
         
-        #Open and send the chunk data the server
+        # Open and send the chunk data the server
             with open(chunk_path, 'rb') as chunk_file:
                 chunk_data = chunk_file.read()
                 client_socket.sendall(chunk_data)
 
-        #ACK for finishing a chunk file
+        # ACK for finishing a chunk file
             ack = client_socket.recv(1024).decode().strip()
             if ack !="OK":
                 raise Exception("Failed to receive acknowledgment from server")
@@ -107,38 +115,38 @@ def upload_chunk(chunk_index, chunk_path, client_socket, socket_lock):
     except Exception as e:
         print(f"Error sending chunk {chunk_path}: {e}")
 
-#DOWLOAD
+# DOWNLOAD
 def download_file(file_path):
     try:
-        #create socket
+        # Create socket
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
-            #connect to server
+            # Connect to server
             client_socket.connect((HOST,PORT))
             print(f"Host: {HOST}, Port: {PORT}")
 
-            #send the request type
+            # Send the request type
             client_socket.sendall("download".encode())
             print(f"Send request to server: download")
 
-            #Send the file name
+            # Send the file name
             client_socket.sendall(file_path.encode())
             print(f"Send filename to server: {file_path}")
-            #ACK for receiving file name
+            # ACK for receiving file name
             ack = client_socket.recv(1024).decode().strip()
             if ack != "OK":
                 raise Exception("Failed to receive acknowledgment from server")
             
-            #Receive the number of chunks 
+            # Receive the number of chunks 
             num_chunks = int(client_socket.recv(1024).decode())
             print(f"Num of chunks: {num_chunks}")
             
-            #Open dialog to choose destination of downLoad folder
+            # Open dialog to choose destination of downLoad folder
             download_folder_path = filedialog.askdirectory()
             if not download_folder_path:
                 print("No download folder selected.")
                 return 
             
-            #Init list to store chunk paths and threads
+            # Init list to store chunk paths and threads
             chunk_paths = []
             threads = []
             for index in range(num_chunks):
@@ -146,10 +154,11 @@ def download_file(file_path):
                 threads.append(thread)
                 thread.start()
 
+            # Wait for all threads finish
             for thread in threads:
                 thread.join()
 
-            #Merge chunks if all were downloaded successfully
+            # Merge chunks if all were downloaded successfully
             if None not in chunk_paths:
                 output_file = os.path.join(download_folder_path, os.path.basename(file_path))
                 merge_chunks(chunk_paths, output_file)
@@ -164,32 +173,32 @@ def download_file(file_path):
 def download_chunk(file_path, client_socket, chunk_paths, download_folder_path):
     try: 
         with socket_lock:
-            #Recive truck infoo
+            # Recive chunk info
             chunk_info = client_socket.recv(1024).decode().strip()
             chunk_index, chunk_size = map(int, chunk_info.split(':'))
-            #ACK for chunk info 
+            # ACK for chunk info 
             client_socket.sendall('OK'.encode())
 
-        #Recive chunk data
+        # Recive chunk data
         chunk_data = b''
         while len(chunk_data) < chunk_size:
             chunk_data += client_socket.recv(min(1024, chunk_size - len(chunk_data)))
 
-            #save the chunk data to a file 
+            # Save the chunk data to a file 
             chunk_path = os.path.join(download_folder_path, f"{file_path}_chunk_data")
             with open(chunk_path, 'wb') as chunk_file:
                 chunk_file.write(chunk_data)
 
-            #ACK for chunk data
+            # ACK for chunk data
             client_socket.sendall('OK'. encode())
             print(f"Received chunk_{chunk_index} size: {chunk_size} ({chunk_info})")
             chunk_paths.append(chunk_path)
     except Exception as e:
         print(f"Error downloading file {file_path}:{e}")
 
-# ACEESS TO BROWSER
+# Receive files name and do the request from client (up or down)
 def select_file_to_upload():
-    #open file fialog to select a file for upload
+    # Open file fialog to select a file for upload
     file_paths = filedialog.askopenfilenames(initialdir = os.getcwd(), title = "choose file")
     for file_path in file_paths:
         if file_path:
@@ -210,30 +219,30 @@ def select_file_to_download():
             print("No file selected to download.")
 
 def main():
-    #Initialize the Tkinter root window
-    global root 
+    # Initialize the Tkinter menu window
+    global menu 
 
-    root = Tk()
-    root.title("File Transfer Application")
-    root.geometry("410x300+500+150")
-    root.configure(bg = "linen")
-    root.resizable(False, False)
+    menu = Tk()
+    menu.title("File Transfer Application")
+    menu.geometry("410x300+500+150")
+    menu.configure(bg = "linen")
+    menu.resizable(False, False)
 
-    # app icon
+    # App icon
     image_icon = PhotoImage(file = "image/transfer.png")
-    root.iconphoto(False, image_icon)
+    menu.iconphoto(False, image_icon)
 
-    # upload button
+    # Upload button
     upload_image = PhotoImage(file = "image/upload.png")
-    upload = Button(root, image = upload_image, bg = "linen", bd = 0, command = select_file_to_upload)
+    upload = Button(menu, image = upload_image, bg = "linen", bd = 0, command = select_file_to_upload)
     upload.place(x = 50, y = 50)
 
-    # download button
+    # Download button
     download_image = PhotoImage(file = "image/download.png")
-    download = Button(root, image = download_image, bg = "linen", bd = 0, command = select_file_to_download)
+    download = Button(menu, image = download_image, bg = "linen", bd = 0, command = select_file_to_download)
     download.place(x = 228, y = 50)
 
-    root.mainloop()
+    menu.mainloop()
 
 if __name__ == "__main__":
     main()
