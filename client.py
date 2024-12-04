@@ -130,7 +130,7 @@ def download_file(file_path):
 
             # Send the file name
             client_socket.sendall(file_path.encode())
-            print(f"Send filename to server: {file_path}")
+            print(f"Send file name to server: {file_path}")
             # ACK for receiving file name
             ack = client_socket.recv(1024).decode().strip()
             if ack != "OK":
@@ -196,6 +196,64 @@ def download_chunk(file_path, client_socket, chunk_paths, download_folder_path):
     except Exception as e:
         print(f"Error downloading file {file_path}:{e}")
 
+# Open a window to enter file name
+def open_file_input_dialog(menu):
+    def add_file_name():
+        file_name = entry.get().strip()
+        if file_name:
+            listbox.insert(tk.END, file_name)
+            entry.delete(0, tk.END)
+        else:
+            messagebox.showwarning("Warning", "file name cannot be blank!")
+
+    def delete_selected_file():
+        selected = listbox.curselection()
+        if selected:
+            listbox.delete(selected[0])
+        else:
+            messagebox.showwarning("Warning", "Select file name to delete!")
+
+    def save_and_close():
+        file_names = listbox.get(0, tk.END)
+        file_names_str = ", ".join(file_names)
+        print("File name entered:")
+        for file_name in file_names:
+            print(file_name)
+        result_var.set(file_names_str)
+        dialog.destroy()
+
+    # Create child window
+    dialog = tk.Toplevel(menu)
+    dialog.title("Enter file name")
+    dialog.geometry("300x300+600+150")
+    dialog.resizable(False, False)
+
+    # Enter file name bar
+    entry_frame = tk.Frame(dialog)
+    entry_frame.pack(pady=10)
+    entry = tk.Entry(entry_frame, width=25)
+    entry.pack(side=tk.LEFT, padx=5)
+    add_button = tk.Button(entry_frame, text="Add", command=add_file_name)
+    add_button.pack(side=tk.RIGHT)
+
+    # List of file name
+    listbox = tk.Listbox(dialog, width=40, height=10)
+    listbox.pack(pady=10)
+
+    # Delete button
+    delete_button = tk.Button(dialog, text="Delete", command=delete_selected_file)
+    delete_button.pack(pady=5)
+
+    # Save & Close button
+    save_button = tk.Button(dialog, text="Save&Close", command=save_and_close)
+    save_button.pack(pady=10)
+
+    # Result to save list of file name
+    result_var = tk.StringVar()
+    dialog.grab_set()  # Khóa các hành động khác khi hộp thoại đang mở
+    dialog.wait_window()  # Chờ hộp thoại đóng lại
+    return result_var.get().strip().split(", ")  # Ensure list is correctly formatted
+
 # Receive files name and do the request from client (up or down)
 def select_file_to_upload():
     # Open file fialog to select a file for upload
@@ -207,9 +265,9 @@ def select_file_to_upload():
         else:
             print("No file selected to up looad.")
     
-def select_file_to_download():
-    # Open file dialog to select a file from 'server_data' folder 
-    file_paths = filedialog.askopenfilenames(initialdir = UPLOAD_FOLDER, title = "choose file")
+def select_file_to_download(menu):
+    # Open window to enter file name
+    file_paths = open_file_input_dialog(menu)
 
     for file_path in file_paths:
         if file_path:
@@ -239,7 +297,7 @@ def main():
 
     # Download button
     download_image = PhotoImage(file = "image/download.png")
-    download = Button(menu, image = download_image, bg = "linen", bd = 0, command = select_file_to_download)
+    download = Button(menu, image=download_image, bg="linen", bd=0, command=lambda: select_file_to_download(menu))
     download.place(x = 228, y = 50)
 
     menu.mainloop()
