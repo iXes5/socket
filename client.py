@@ -180,12 +180,12 @@ def download_chunk(file_path, client_socket, chunk_paths, download_folder_path):
             client_socket.sendall('OK'.encode())
 
         # Recive chunk data
-        chunk_data = b''
-        while len(chunk_data) < chunk_size:
-            chunk_data += client_socket.recv(min(1024, chunk_size - len(chunk_data)))
+            chunk_data = b''
+            while len(chunk_data) < chunk_size:
+                chunk_data += client_socket.recv(min(1024, chunk_size - len(chunk_data)))
 
             # Save the chunk data to a file 
-            chunk_path = os.path.join(download_folder_path, f"{file_path}_chunk_data")
+            chunk_path = os.path.join(download_folder_path, f"{file_path}_part_{chunk_index}")
             with open(chunk_path, 'wb') as chunk_file:
                 chunk_file.write(chunk_data)
 

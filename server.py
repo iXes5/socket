@@ -156,9 +156,7 @@ def handle_download(conn, file_name):
 
     except Exception as E:
         print(f"Error handling download: {E}")
-    finally:
-        for chunk in chunks:
-            os.remove(chunk)
+    
 
 def send_chunk(conn, chunk_index, chunk_path, num_chunks):
     try:
