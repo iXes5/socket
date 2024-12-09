@@ -48,6 +48,7 @@ def handle_client(conn, addr):
         while True:
             # Receive the request form client
             request_type, file_info = receive_request_type_and_file_info(conn)
+            print(f"{request_type} {file_info}")
             if not request_type or not file_info:
                 raise ValueError("Invalid request file or file info")
             print(f"Request file: {request_type}")
@@ -70,6 +71,8 @@ def handle_client(conn, addr):
             # Disconnect request
             elif request_type == 'disconnect':
                 conn.sendall("BYE".encode())
+                print(f"Client {addr} disconnected")
+                conn.close()
                 break
 
             else:
@@ -82,9 +85,6 @@ def handle_client(conn, addr):
         print(f"Cannot parsing file info: {E}")
     except Exception as E:
         print(f"Error: {E}")
-    finally:
-        print(f"Client {addr} requested disconnection.")
-        conn.close()
 
 # Handle upload request
 def handle_upload(conn, file_name, num_chunks):
