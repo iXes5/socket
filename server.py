@@ -9,6 +9,10 @@ CHUNK_SIZE = 1024*64
 DATA_FOLDER = 'server_data'
 socket_lock = threading.Lock()
 
+# If not server_data, create server_data
+if not os.path.exists(DATA_FOLDER):
+    os.makedirs(DATA_FOLDER)
+
 # Split file into chunks
 def split_file(file_path, chunk_size):
     chunks = []
@@ -39,27 +43,37 @@ def merge_chunks(chunks, output_file):
 
 # Accept connect from client and do the request
 def handle_client(conn, addr):
-    print(f"Connected by {addr}")
+    print(f"Connected from {addr}")
     try:
-        request_type, file_info = receive_request_type_and_file_info(conn)
-        if not request_type or not file_info:
-            raise ValueError("Invalid request file or file info")
-        print(f"Request file: {request_type}")
-        print(f"File info: {file_info}")
+        while True:
+            # Receive the request form client
+            request_type, file_info = receive_request_type_and_file_info(conn)
+            if not request_type or not file_info:
+                raise ValueError("Invalid request file or file info")
+            print(f"Request file: {request_type}")
+            if file_info:
+                print(f"File info: {file_info}")
 
-        if request_type == 'upload':
-            file_name, num_chunks = file_info.strip().split(':')
-            num_chunks = int(num_chunks.strip())
-            print(f"File upload's name: {file_name}, num of chunks: {num_chunks}")
-            handle_upload(conn, file_name, num_chunks)
+            # Upload request
+            if request_type == 'upload':
+                file_name, num_chunks = file_info.strip().split(':')
+                num_chunks = int(num_chunks.strip())
+                print(f"File upload's name: {file_name}, num of chunks: {num_chunks}")
+                handle_upload(conn, file_name, num_chunks)
 
-        elif request_type == 'download':
-            file_name = file_info.strip()
-            print(f"File download's name: {file_name}")
-            handle_download(conn, file_name)
+            # Download request
+            elif request_type == 'download':
+                file_name = file_info.strip()
+                print(f"File download's name: {file_name}")
+                handle_download(conn, file_name)
 
-        else:
-            print(f"Unknown request type: {request_type}")
+            # Disconnect request
+            elif request_type == 'disconnect':
+                conn.sendall("BYE".encode())
+                break
+
+            else:
+                print(f"Unknown request type: {request_type}")
     except socket.error as E:
         print(f"Socket error: {E}")
     except OSError as E:
@@ -69,6 +83,7 @@ def handle_client(conn, addr):
     except Exception as E:
         print(f"Error: {E}")
     finally:
+        print(f"Client {addr} requested disconnection.")
         conn.close()
 
 # Handle upload request
@@ -183,15 +198,22 @@ def send_chunk(conn, chunk_index, chunk_path, num_chunks):
         print(f"Error sending chunk: {E}")
 
 def receive_request_type_and_file_info(conn):
-    # Request structure: {request_type}{file_name:num_chunks}
-    data = conn.recv(1024).decode().strip()
-    conn.sendall("OK".encode())
+    try:
+        data = conn.recv(1024).decode().strip()
+        conn.sendall("OK".encode())
 
-    if data.startswith('upload'):
-        return 'upload', data[len('upload'):]
-    elif data.startswith('download'):
-        return 'download', data[len('download'):]
-    else:
+        if data.startswith('upload'):
+            return 'upload', data[len('upload'):]
+        elif data.startswith('download'):
+            return 'download', data[len('download'):]
+        elif data.startswith('disconnect'):
+            info = data[len('disconnect:'):] if ':' in data else None
+            return 'disconnect', info
+        else:
+            print(f"Unknown request received: {data}")
+            return None, None
+    except Exception as e:
+        print(f"Error receiving data: {e}")
         return None, None
 
 # Make sure file name not duplicate
@@ -210,14 +232,12 @@ def ensure_unique_filename(file_path):
 def start_server():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         server_socket.bind((HOST, PORT))
-
-        server_socket.listen()
+        server_socket.listen(50)
         print(f"Server started: {HOST} {PORT}")
 
         # Accept the request from multiple client
         while True:
             conn, addr = server_socket.accept()
-            print(f"Client {addr[0]}:{addr[1]}")
             client_thread = threading.Thread(target=handle_client, args=(conn, addr))
             client_thread.start()
 
