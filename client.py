@@ -114,7 +114,7 @@ def upload_chunk(chunk_index, chunk_path, client_socket, socket_lock):
         print(f"Error sending chunk {chunk_path}: {e}")
 
 # DOWNLOAD
-def download_file(file_path):
+def download_file(file_path, download_folder_path):
     global client_socket
     if not client_socket:
         print("No connection to server.")
@@ -135,8 +135,7 @@ def download_file(file_path):
         num_chunks = int(client_socket.recv(1024).decode())
         print(f"Num of chunks: {num_chunks}")
         
-        # Open dialog to choose destination of downLoad folder
-        download_folder_path = filedialog.askdirectory()
+        
         if not download_folder_path:
             print("No download folder selected.")
             return 
@@ -263,24 +262,38 @@ def connect_to_server():
 def select_file_to_upload():
     # Open file fialog to select a file for upload
     file_paths = filedialog.askopenfilenames(initialdir = os.getcwd(), title = "choose file")
+    threads = []
     for file_path in file_paths:
         if file_path:
             print(f"File selected: {file_path}")
-            upload_file(file_path)
+            thread = threading.Thread(target = upload_file, args = (file_path))
+            threads.append(thread)
+            thread.start()
         else:
             print("No file selected to up looad.")
+
+    for thread in threads:
+        thread.join()
     
 def select_file_to_download(menu):
     # Open window to enter file name
     file_paths = open_file_input_dialog(menu)
-
+    # Open dialog to choose destination of downLoad folder
+    download_folder_path = filedialog.askdirectory()
+    threads = []
     for file_path in file_paths:
         if file_path:
             print(f"File selected: {file_path}")
-            download_file(file_path)
+            thread = threading.Thread(target = download_file, args = (file_path,download_folder_path))
+            threads.append(thread)
+            thread.start()
         else:
             print("No file selected to download.")
 
+    for thread in threads:
+        thread.join()
+    
+    
 # Log out account
 def disconnect_to_server():
     global client_socket
