@@ -258,7 +258,7 @@ def login_account(username, password):
         print(f"Cannot login: {e}")
 
 # Log out account
-def disconnect_to_server(secondary_window):
+def disconnect_to_server():
     global client_socket
     if not client_socket:
         print("No connection to server")
@@ -282,9 +282,6 @@ def disconnect_to_server(secondary_window):
         client_socket = None
     except Exception as e:
         print(f"Cannot disconnect: {e}")
-    
-    # Close the secondary window after disconnect
-    secondary_window.destroy()
 
 # Open a window to enter file name
 def open_file_input_dialog(menu):
@@ -348,7 +345,7 @@ def open_file_input_dialog(menu):
 def show_secondary_window():
     secondary_window = tk.Toplevel(menu)
     secondary_window.title("Main Menu")
-    secondary_window.geometry("500x300+500+200")
+    secondary_window.geometry("400x400+500+200")
     secondary_window.configure(bg="linen")
     secondary_window.resizable(False, False)
 
@@ -371,8 +368,9 @@ def show_secondary_window():
     # Disconnect button
     disconnect_image = PhotoImage(file="image/disconnect.png")
     Button(button_frame, image=disconnect_image, bg="linen", bd=0,
-           command=lambda: disconnect_to_server(secondary_window)).grid(row=0, column=2, padx=10)
+           command=lambda: [disconnect_to_server(), secondary_window.destroy()]).grid(row=0, column=2, padx=10)
     disconnect_image.image = disconnect_image
+
 
 def main():
     # Initialize the Tkinter menu window

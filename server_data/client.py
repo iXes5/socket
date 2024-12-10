@@ -4,11 +4,16 @@ import threading
 # GUI
 import tkinter as tk
 from tkinter import Tk
-from tkinter import filedialog
-from tkinter import simpledialog
 from tkinter import PhotoImage 
 from tkinter import Button
+from tkinter import Label
+from tkinter import Entry
+from tkinter import Frame
+from tkinter import filedialog
+from tkinter import simpledialog
 from tkinter import messagebox
+# Import ttk for Progressbar
+from tkinter import ttk  
 
 # IP loopback (use for test)
 HOST ='127.0.0.1'
@@ -43,12 +48,12 @@ def merge_chunks(chunks, output_file):
 # UPLOAD
 def upload_file(file_path):
     global client_socket
+
     if not client_socket:
         print("No connection to server.")
         return
-    
+
     try:
-        # Split the file into chunks
         chunks = split_file(file_path, CHUNK_SIZE)
         num_chunks = len(chunks)
         print(f"Num of chunks: {num_chunks}")
@@ -58,23 +63,19 @@ def upload_file(file_path):
         client_socket.sendall(f"upload{file_info}".encode())
         print(f"Send request to server: upload")
 
-        # Receive acknowledgment for file info
         ack = client_socket.recv(1024).decode().strip()
         if ack != 'OK':
             raise Exception("Failed to receive acknowledgment from server")
-        
-        # Create threads to upload each chunk
+
         threads = []
         for index, chunk_path in enumerate(chunks):
             thread = threading.Thread(target=upload_chunk, args=(index, chunk_path, client_socket, socket_lock))
             threads.append(thread)
             thread.start()
 
-        # Wait for all threads finish
         for thread in threads:
             thread.join()
 
-        # Final ACK
         ack = client_socket.recv(1024).decode().strip()
         if ack != "OK":
             raise Exception("Failed to receive acknowledgment from server")
@@ -83,38 +84,33 @@ def upload_file(file_path):
     except Exception as e:
         print(f"Error uploading file {file_path}: {e}")
     finally:
-        # Clean up chunk file
         for chunk in chunks:
             if os.path.exists(chunk):
                 os.remove(chunk)
 
 def upload_chunk(chunk_index, chunk_path, client_socket, socket_lock):
     try:
-        # Synchronize access to the socket
         with socket_lock:
-            # Send chunk index and size
             client_socket.sendall(f"{chunk_index}:{os.path.getsize(chunk_path)}".encode())
-            # ACK for chunk index and size 
             ack = client_socket.recv(1024).decode().strip()
             if ack != "OK":
                 raise Exception("Failed to receive acknowledgment from server")
-        
-        # Open and send the chunk data the server
-            with open(chunk_path, 'rb') as chunk_file:
-                chunk_data = chunk_file.read()
-                client_socket.sendall(chunk_data)
 
-        # ACK for finishing a chunk file
-            ack = client_socket.recv(1024).decode().strip()
-            if ack !="OK":
-                raise Exception("Failed to receive acknowledgment from server")
-            else:
-                print(f"Sent chunk {chunk_path} size: {os.path.getsize(chunk_path)}")
+        with open(chunk_path, 'rb') as chunk_file:
+            chunk_data = chunk_file.read()
+            client_socket.sendall(chunk_data)
+
+        ack = client_socket.recv(1024).decode().strip()
+        if ack != "OK":
+            raise Exception("Failed to receive acknowledgment from server")
+        else:
+            print(f"Sent chunk {chunk_path} size: {os.path.getsize(chunk_path)}")
+
     except Exception as e:
         print(f"Error sending chunk {chunk_path}: {e}")
 
 # DOWNLOAD
-def download_file(file_path):
+def download_file(file_path, download_folder_path):
     global client_socket
     if not client_socket:
         print("No connection to server.")
@@ -134,12 +130,6 @@ def download_file(file_path):
         # Receive the number of chunks 
         num_chunks = int(client_socket.recv(1024).decode())
         print(f"Num of chunks: {num_chunks}")
-        
-        # Open dialog to choose destination of downLoad folder
-        download_folder_path = filedialog.askdirectory()
-        if not download_folder_path:
-            print("No download folder selected.")
-            return 
         
         # Init list to store chunk paths and threads
         chunk_paths = []
@@ -188,8 +178,110 @@ def download_chunk(file_path, client_socket, chunk_paths, download_folder_path):
             client_socket.sendall('OK'. encode())
             print(f"Received chunk_{chunk_index} size: {chunk_size} ({chunk_info})")
             chunk_paths.append(chunk_path)
+
     except Exception as e:
         print(f"Error downloading file {file_path}:{e}")
+
+def connect_to_server():
+    global client_socket
+    try:
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((HOST, PORT))
+        print(f"Connected to server at {HOST}:{PORT}")
+    except Exception as e:
+        print(f"Error connecting to server: {e}")
+        client_socket = None
+
+# Receive files name and do the request from client (up or down)
+def select_file_to_upload():
+    # Open file fialog to select a file for upload
+    file_paths = filedialog.askopenfilenames(initialdir = os.getcwd(), title = "choose file")
+    for file_path in file_paths:
+        if file_path:
+            print(f"File selected: {file_path}")
+            upload_file(file_path)
+        else:
+            print("No file selected to up looad.")
+    
+def select_file_to_download(menu):
+    # Open window to enter file name
+    file_paths = open_file_input_dialog(menu)
+
+    # Open dialog to choose destination of downLoad folder
+    download_folder_path = filedialog.askdirectory()
+    if not download_folder_path:
+        print("No download folder selected.")
+        return 
+
+    for file_path in file_paths:
+        if file_path:
+            print(f"File selected: {file_path}")
+            download_file(file_path, download_folder_path)
+        else:
+            print("No file selected to download.")
+
+# Register account
+def register_account(username, password):
+    global client_socket
+    connect_to_server()
+    try:
+        # Send username and password to server
+        client_socket.sendall(f"register{username}:{password}".encode())
+        print(f"Send request to server: register")
+        
+        # Waiting for response
+        response = client_socket.recv(1024).decode()
+        if (response == 'OK'):
+            print(f"Register successfully")
+            show_secondary_window()
+    except Exception as e:
+        print(f"Cannot register: {e}")
+
+# Login account
+def login_account(username, password):
+    global client_socket
+    connect_to_server()
+    try:
+        # Send username and password to server
+        client_socket.sendall(f"login{username}:{password}".encode())
+        print(f"Send request to server: login")
+        
+        # Waiting for response
+        response = client_socket.recv(1024).decode()
+        if (response == 'OK'):
+            print(f"Login successfully")
+            show_secondary_window()
+        else:
+            print(f"Wrong username or password")
+            client_socket.close()
+    except Exception as e:
+        print(f"Cannot login: {e}")
+
+# Log out account
+def disconnect_to_server():
+    global client_socket
+    if not client_socket:
+        print("No connection to server")
+        return
+    
+    try:
+        # Send disconnect request to the server with additional info
+        client_id = "goodbye"
+        client_socket.sendall(f"disconnect:{client_id}".encode())
+        print(f"Send request to server: disconnect")
+        
+        # Waiting for response
+        response = client_socket.recv(1024).decode()
+        if (response == 'OK'):
+            response = client_socket.recv(1024).decode()
+        print(f"Response from server: {response}")
+
+        # Close socket
+        client_socket.close()
+        print("Disconnected from server")
+        client_socket = None
+    except Exception as e:
+        print(f"Cannot disconnect: {e}")
 
 # Open a window to enter file name
 def open_file_input_dialog(menu):
@@ -249,97 +341,66 @@ def open_file_input_dialog(menu):
     dialog.wait_window()
     return result_var.get().strip().split(", ")  # Ensure list is correctly formatted
 
-def connect_to_server():
-    global client_socket
-    try:
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.connect((HOST, PORT))
-        print(f"Connected to server at {HOST}:{PORT}")
-    except Exception as e:
-        print(f"Error connecting to server: {e}")
-        client_socket = None
+# Show main menu
+def show_secondary_window():
+    """
+    Hiển thị cửa sổ con chứa ba nút: Upload, Download và Disconnect nằm ngang nhau.
+    """
+    secondary_window = tk.Toplevel(menu)
+    secondary_window.title("Main Menu")
+    secondary_window.geometry("400x300+600+200")
+    secondary_window.configure(bg="linen")
+    secondary_window.resizable(False, False)
 
-# Receive files name and do the request from client (up or down)
-def select_file_to_upload():
-    # Open file fialog to select a file for upload
-    file_paths = filedialog.askopenfilenames(initialdir = os.getcwd(), title = "choose file")
-    for file_path in file_paths:
-        if file_path:
-            print(f"File selected: {file_path}")
-            upload_file(file_path)
-        else:
-            print("No file selected to up looad.")
-    
-def select_file_to_download(menu):
-    # Open window to enter file name
-    file_paths = open_file_input_dialog(menu)
+    # Frame to contain buttons
+    button_frame = Frame(secondary_window, bg="linen")
+    button_frame.pack(expand=True, pady=20)
 
-    for file_path in file_paths:
-        if file_path:
-            print(f"File selected: {file_path}")
-            download_file(file_path)
-        else:
-            print("No file selected to download.")
+    # Upload button
+    upload_image = PhotoImage(file="image/upload.png")
+    Button(button_frame, image=upload_image, bg="linen", bd=0,
+           command=select_file_to_upload).grid(row=0, column=0, padx=10)
+    upload_image.image = upload_image
 
-# Log out account
-def disconnect_to_server():
-    global client_socket
-    if not client_socket:
-        print("No connection to server")
-        return
-    
-    try:
-        # Send disconnect request to the server with additional info
-        client_id = "goodbye"
-        client_socket.sendall(f"disconnect:{client_id}".encode())
-        print(f"Send request to server: disconnect")
-        
-        # Waiting for response
-        response = client_socket.recv(1024).decode()
-        if (response == 'OK'):
-            response = client_socket.recv(1024).decode()
-        print(f"Response from server: {response}")
+    # Download button
+    download_image = PhotoImage(file="image/download.png")
+    Button(button_frame, image=download_image, bg="linen", bd=0,
+           command=lambda: select_file_to_download(menu)).grid(row=0, column=1, padx=10)
+    download_image.image = download_image
 
-        # Đóng kết nối
-        client_socket.close()
-        print("Disconnected from server")
-        client_socket = None
-    except Exception as e:
-        print(f"Cannot disconnect: {e}")
+    # Disconnect button
+    disconnect_image = PhotoImage(file="image/disconnect.png")
+    Button(button_frame, image=disconnect_image, bg="linen", bd=0,
+           command=lambda: [disconnect_to_server(), secondary_window.destroy()]).grid(row=0, column=2, padx=10)
+    disconnect_image.image = disconnect_image
 
 
 def main():
     # Initialize the Tkinter menu window
-    global menu 
-
-    # Connect to server
-    connect_to_server()
-
+    global menu
     menu = Tk()
     menu.title("File Transfer Application")
-    menu.geometry("410x400+500+150")
-    menu.configure(bg = "linen")
+    screen_width = menu.winfo_screenwidth()
+    screen_height = menu.winfo_screenheight()
+    place_x = int((screen_width - 400) / 2)
+    place_y = int((screen_height - 300) / 2)
+    menu.geometry(f"400x300+{place_x}+{place_y}")
+    menu.configure(bg="linen")
     menu.resizable(False, False)
 
-    # App icon
-    image_icon = PhotoImage(file = "image/transfer.png")
-    menu.iconphoto(False, image_icon)
+    # Giao diện đăng nhập
+    Label(menu, text="Username:", bg="linen").grid(row=0, column=0, padx=5, pady=5)
+    username_entry = Entry(menu)
+    username_entry.grid(row=0, column=1, padx=5, pady=5)
 
-    # Upload button
-    upload_image = PhotoImage(file = "image/upload.png")
-    upload = Button(menu, image = upload_image, bg = "linen", bd = 0, command = select_file_to_upload)
-    upload.place(x = 50, y = 50)
+    Label(menu, text="Password:", bg="linen").grid(row=1, column=0, padx=5, pady=5)
+    password_entry = Entry(menu, show="*")
+    password_entry.grid(row=1, column=1, padx=5, pady=5)
 
-    # Download button
-    download_image = PhotoImage(file = "image/download.png")
-    download = Button(menu, image = download_image, bg = "linen", bd = 0, command = lambda: select_file_to_download(menu))
-    download.place(x = 228, y = 50)
-
-    # Disconnect button
-    disconnect_image = PhotoImage(file = "image/disconnect.png")
-    disconnect = Button(menu, image = disconnect_image, bg = "linen", bd = 0, command = disconnect_to_server)
-    disconnect.place(x = 150, y = 250)
-
+    Button(menu, text="Login",
+           command=lambda: login_account(username_entry.get(), password_entry.get()), bg="linen").grid(row=2, column=0, padx=5, pady=10)
+    Button(menu, text="Register",
+           command=lambda: register_account(username_entry.get(), password_entry.get()), bg="linen").grid(row=2, column=1, padx=5, pady=10)
     menu.mainloop()
 
 if __name__ == "__main__":

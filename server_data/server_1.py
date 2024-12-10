@@ -133,8 +133,8 @@ def handle_client(conn, addr):
                 # Disconnect request
                 elif request_type == 'disconnect':
                     conn.sendall("BYE".encode())
-                    conn.close()
                     print(f"Client {addr} disconnected")
+                    conn.close()
                     break
 
                 else:
