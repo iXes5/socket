@@ -12,8 +12,8 @@ from tkinter import Frame
 from tkinter import filedialog
 from tkinter import simpledialog
 from tkinter import messagebox
+# Import ttk for Progressbar
 from tkinter import ttk  
-from alive_progress import alive_bar
 
 # IP loopback (use for test)
 HOST ='127.0.0.1'
@@ -220,14 +220,8 @@ def select_file_to_download(menu):
         else:
             print("No file selected to download.")
 
-from tkinter import messagebox
-
 # Register account
 def register_account(username, password):
-    if not username or not password:
-        messagebox.showerror("Error", "Username and password cannot be empty!")
-        return
-
     global client_socket
     connect_to_server()
     try:
@@ -237,22 +231,14 @@ def register_account(username, password):
         
         # Waiting for response
         response = client_socket.recv(1024).decode()
-        if response == 'OK':
+        if (response == 'OK'):
             print(f"Register successfully")
             show_secondary_window()
-        elif response == 'EXISTS':
-            print(f"Username existened")
-            client_socket.close()
     except Exception as e:
         print(f"Cannot register: {e}")
-        messagebox.showerror("Error", f"Cannot register: {e}")
 
 # Login account
 def login_account(username, password):
-    if not username or not password:
-        messagebox.showerror("Error", "Username and password cannot be empty!")
-        return
-
     global client_socket
     connect_to_server()
     try:
@@ -262,7 +248,7 @@ def login_account(username, password):
         
         # Waiting for response
         response = client_socket.recv(1024).decode()
-        if response == 'OK':
+        if (response == 'OK'):
             print(f"Login successfully")
             show_secondary_window()
         else:
@@ -270,7 +256,6 @@ def login_account(username, password):
             client_socket.close()
     except Exception as e:
         print(f"Cannot login: {e}")
-        messagebox.showerror("Error", f"Cannot login: {e}")
 
 # Log out account
 def disconnect_to_server(secondary_window):
@@ -363,13 +348,13 @@ def open_file_input_dialog(menu):
 def show_secondary_window():
     secondary_window = tk.Toplevel(menu)
     secondary_window.title("Main Menu")
-    secondary_window.geometry("500x250+500+200")
+    secondary_window.geometry("500x300+500+200")
     secondary_window.configure(bg="linen")
     secondary_window.resizable(False, False)
 
     # Frame to contain buttons
     button_frame = Frame(secondary_window, bg="linen")
-    button_frame.pack(expand=False, pady=40)
+    button_frame.pack(expand=True, pady=20)
 
     # Upload button
     upload_image = PhotoImage(file="image/upload.png")
@@ -402,33 +387,19 @@ def main():
     menu.configure(bg="linen")
     menu.resizable(False, False)
 
-    # Title
-    title_label = Label(menu, text="Welcome back", font=("Helvetica", 16, "bold"), bg="linen", fg="black")
-    title_label.pack(pady=20)
-
-    # Frame contain widget
-    login_frame = Frame(menu, bg="linen")
-    login_frame.pack(expand=False, pady=15)
-
-    # Username
-    Label(login_frame, text="Username:", bg="linen").grid(row=0, column=0, padx=5, pady=5, sticky="e")
-    username_entry = Entry(login_frame)
+    # Giao diện đăng nhập
+    Label(menu, text="Username:", bg="linen").grid(row=0, column=0, padx=5, pady=5)
+    username_entry = Entry(menu)
     username_entry.grid(row=0, column=1, padx=5, pady=5)
 
-    # Password
-    Label(login_frame, text="Password:", bg="linen").grid(row=1, column=0, padx=5, pady=5, sticky="e")
-    password_entry = Entry(login_frame, show="*")
+    Label(menu, text="Password:", bg="linen").grid(row=1, column=0, padx=5, pady=5)
+    password_entry = Entry(menu, show="*")
     password_entry.grid(row=1, column=1, padx=5, pady=5)
 
-    # Login button
-    Button(login_frame, text="Login",
-        command=lambda: login_account(username_entry.get(), password_entry.get()), bg="linen").grid(row=2, column=0, padx=5, pady=10)
-    
-    # Register button
-    Button(login_frame, text="Register",
-        command=lambda: register_account(username_entry.get(), password_entry.get()), bg="linen").grid(row=2, column=1, padx=5, pady=10)
-
-    # Main loop
+    Button(menu, text="Login",
+           command=lambda: login_account(username_entry.get(), password_entry.get()), bg="linen").grid(row=2, column=0, padx=5, pady=10)
+    Button(menu, text="Register",
+           command=lambda: register_account(username_entry.get(), password_entry.get()), bg="linen").grid(row=2, column=1, padx=5, pady=10)
     menu.mainloop()
 
 if __name__ == "__main__":
