@@ -67,14 +67,15 @@ def upload_file(file_path):
         if ack != 'OK':
             raise Exception("Failed to receive acknowledgment from server")
 
-        threads = []
-        for index, chunk_path in enumerate(chunks):
-            thread = threading.Thread(target=upload_chunk, args=(index, chunk_path, client_socket, socket_lock))
-            threads.append(thread)
-            thread.start()
+        with alive_bar(num_chunks, title="Uploading") as bar:
+            threads = []
+            for index, chunk_path in enumerate(chunks):
+                thread = threading.Thread(target=upload_chunk, args=(index, chunk_path, client_socket, socket_lock, bar))
+                threads.append(thread)
+                thread.start()
 
-        for thread in threads:
-            thread.join()
+            for thread in threads:
+                thread.join()
 
         ack = client_socket.recv(1024).decode().strip()
         if ack != "OK":
@@ -88,7 +89,7 @@ def upload_file(file_path):
             if os.path.exists(chunk):
                 os.remove(chunk)
 
-def upload_chunk(chunk_index, chunk_path, client_socket, socket_lock):
+def upload_chunk(chunk_index, chunk_path, client_socket, socket_lock, bar):
     try:
         with socket_lock:
             client_socket.sendall(f"{chunk_index}:{os.path.getsize(chunk_path)}".encode())
@@ -104,8 +105,7 @@ def upload_chunk(chunk_index, chunk_path, client_socket, socket_lock):
         if ack != "OK":
             raise Exception("Failed to receive acknowledgment from server")
         else:
-            print(f"Sent chunk {chunk_path} size: {os.path.getsize(chunk_path)}")
-
+            bar()  # Update progress bar
     except Exception as e:
         print(f"Error sending chunk {chunk_path}: {e}")
 
@@ -133,15 +133,16 @@ def download_file(file_path, download_folder_path):
         
         # Init list to store chunk paths and threads
         chunk_paths = []
-        threads = []
-        for index in range(num_chunks):
-            thread = threading.Thread(target=download_chunk, args=(file_path, client_socket, chunk_paths, download_folder_path))
-            threads.append(thread)
-            thread.start()
+        with alive_bar(num_chunks, title="Downloading") as bar:
+            threads = []
+            for index in range(num_chunks):
+                thread = threading.Thread(target=download_chunk, args=(file_path, client_socket, chunk_paths, download_folder_path, bar))
+                threads.append(thread)
+                thread.start()
 
-        # Wait for all threads finish
-        for thread in threads:
-            thread.join()
+            # Wait for all threads finish
+            for thread in threads:
+                thread.join()
 
         # Merge chunks if all were downloaded successfully
         if None not in chunk_paths:
@@ -155,7 +156,7 @@ def download_file(file_path, download_folder_path):
     except Exception as E:
         print(f"Error: {E}")
 
-def download_chunk(file_path, client_socket, chunk_paths, download_folder_path):
+def download_chunk(file_path, client_socket, chunk_paths, download_folder_path, bar):
     try: 
         with socket_lock:
             # Recive chunk info
@@ -178,9 +179,10 @@ def download_chunk(file_path, client_socket, chunk_paths, download_folder_path):
             client_socket.sendall('OK'. encode())
             print(f"Received chunk_{chunk_index} size: {chunk_size} ({chunk_info})")
             chunk_paths.append(chunk_path)
-
+            bar()  # Update progress bar
     except Exception as e:
         print(f"Error downloading file {file_path}:{e}")
+
 
 def connect_to_server():
     global client_socket
