@@ -61,22 +61,36 @@ def handle_account(conn, addr):
             conn.sendall(f"NO".encode())
             print(f"Client {addr} failed to login")
             return False
-        
+
         elif data.startswith('register'):
             account_info = data[len('register'):].strip()
             username, password = account_info.split(':')
+            
+            # Kiểm tra username trùng
+            with open(DATA_ACCOUNT, 'r') as f:
+                accounts = f.readlines()
+            for account in accounts:
+                stored_username, _ = account.strip().split(':')
+                if username == stored_username:
+                    conn.sendall(f"EXISTS".encode())
+                    print(f"Client {addr} tried to register with an existing username: {username}")
+                    return False
+
+            # Thêm tài khoản mới nếu không trùng
             with open(DATA_ACCOUNT, 'a') as f:
                 f.write(f"{username}:{password}\n")
             conn.sendall(f"OK".encode())
             print(f"Client {addr} register successfully")
             return True
-        
+
         else:
             print(f"Unknown request received: {data}")
             conn.sendall(b"Error")
             return None
+
     except Exception as e:
         print(f"Error handling request: {e}")
+        conn.sendall(b"Error")
         return None
 
 # Handle login or register request
