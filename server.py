@@ -5,7 +5,7 @@ import threading
 # IP loopback (use for test)
 HOST ='127.0.0.1'
 PORT = 55555
-CHUNK_SIZE = 1024
+CHUNK_SIZE = 1024*512
 DATA_FOLDER = 'server_data'
 DATA_ACCOUNT = 'account_data/account_info.txt'
 socket_lock = threading.Lock()
@@ -124,7 +124,6 @@ def handle_client(conn, addr):
             while True:
                 # Receive the request form client
                 request_type, file_info = receive_request_type_and_file_info(conn)
-                print(f"{request_type} {file_info}")
                 if not request_type or not file_info:
                     raise ValueError("Invalid request file or file info")
                 print(f"Request file: {request_type}")

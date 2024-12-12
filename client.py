@@ -18,7 +18,7 @@ from alive_progress import alive_bar
 # IP loopback (use for test)
 HOST ='127.0.0.1'
 PORT = 55555
-CHUNK_SIZE = 1024
+CHUNK_SIZE = 1024*512
 UPLOAD_FOLDER = 'server_data'
 socket_lock = threading.Lock()
 client_socket = None
