@@ -68,13 +68,14 @@ def upload_file(file_path):
             raise Exception("Failed to receive acknowledgment from server")
 
         threads = []
-        for index, chunk_path in enumerate(chunks):
-            thread = threading.Thread(target=upload_chunk, args=(index, chunk_path, client_socket, socket_lock))
-            threads.append(thread)
-            thread.start()
+        with alive_bar(num_chunks, title="Uploading File") as bar:
+            for index, chunk_path in enumerate(chunks):
+                thread = threading.Thread(target=upload_chunk, args=(index, chunk_path, client_socket, socket_lock, bar))
+                threads.append(thread)
+                thread.start()
 
-        for thread in threads:
-            thread.join()
+            for thread in threads:
+                thread.join()
 
         ack = client_socket.recv(1024).decode().strip()
         if ack != "OK":
@@ -88,7 +89,7 @@ def upload_file(file_path):
             if os.path.exists(chunk):
                 os.remove(chunk)
 
-def upload_chunk(chunk_index, chunk_path, client_socket, socket_lock):
+def upload_chunk(chunk_index, chunk_path, client_socket, socket_lock, progress_bar):
     try:
         with socket_lock:
             client_socket.sendall(f"{chunk_index}:{os.path.getsize(chunk_path)}".encode())
@@ -104,8 +105,7 @@ def upload_chunk(chunk_index, chunk_path, client_socket, socket_lock):
             if ack != "OK":
                 raise Exception("Failed to receive acknowledgment from server")
             else:
-                print(f"Sent chunk {chunk_path} size: {os.path.getsize(chunk_path)}")
-
+                progress_bar()  # Update progress bar
     except Exception as e:
         print(f"Error sending chunk {chunk_path}: {e}")
 
@@ -115,33 +115,34 @@ def download_file(file_path, download_folder_path):
     if not client_socket:
         print("No connection to server.")
         return
-    
+
     try:
         # Send request type and file info
         client_socket.sendall(f"download{file_path}".encode())
         print(f"Send request to server: download")
         print(f"Send file name to server: {file_path}")
-        
+
         # Receive acknowledgment
         ack = client_socket.recv(1024).decode().strip()
         if ack != "OK":
             raise Exception("Failed to receive acknowledgment from server")
-        
-        # Receive the number of chunks 
+
+        # Receive the number of chunks
         num_chunks = int(client_socket.recv(1024).decode())
         print(f"Num of chunks: {num_chunks}")
-        
+
         # Init list to store chunk paths and threads
         chunk_paths = []
         threads = []
-        for index in range(num_chunks):
-            thread = threading.Thread(target=download_chunk, args=(file_path, client_socket, chunk_paths, download_folder_path))
-            threads.append(thread)
-            thread.start()
+        with alive_bar(num_chunks, title="Downloading File") as bar:
+            for index in range(num_chunks):
+                thread = threading.Thread(target=download_chunk, args=(file_path, client_socket, chunk_paths, download_folder_path, bar))
+                threads.append(thread)
+                thread.start()
 
-        # Wait for all threads finish
-        for thread in threads:
-            thread.join()
+            # Wait for all threads finish
+            for thread in threads:
+                thread.join()
 
         # Merge chunks if all were downloaded successfully
         if None not in chunk_paths:
@@ -155,30 +156,29 @@ def download_file(file_path, download_folder_path):
     except Exception as E:
         print(f"Error: {E}")
 
-def download_chunk(file_path, client_socket, chunk_paths, download_folder_path):
-    try: 
+def download_chunk(file_path, client_socket, chunk_paths, download_folder_path, progress_bar):
+    try:
         with socket_lock:
-            # Recive chunk info
+            # Receive chunk info
             chunk_info = client_socket.recv(1024).decode().strip()
             chunk_index, chunk_size = map(int, chunk_info.split(':'))
-            # ACK for chunk info 
+            # ACK for chunk info
             client_socket.sendall('OK'.encode())
 
-        # Recive chunk data
+            # Receive chunk data
             chunk_data = b''
             while len(chunk_data) < chunk_size:
                 chunk_data += client_socket.recv(min(1024, chunk_size - len(chunk_data)))
 
-            # Save the chunk data to a file 
+            # Save the chunk data to a file
             chunk_path = os.path.join(download_folder_path, f"{file_path}_part_{chunk_index}")
             with open(chunk_path, 'wb') as chunk_file:
                 chunk_file.write(chunk_data)
 
             # ACK for chunk data
-            client_socket.sendall('OK'. encode())
-            print(f"Received chunk_{chunk_index} size: {chunk_size} ({chunk_info})")
+            client_socket.sendall('OK'.encode())
             chunk_paths.append(chunk_path)
-
+            progress_bar()  # Update progress bar
     except Exception as e:
         print(f"Error downloading file {file_path}:{e}")
 
