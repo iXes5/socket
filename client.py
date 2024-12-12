@@ -112,6 +112,7 @@ def upload_chunk(chunk_index, chunk_path, client_socket, socket_lock, progress_b
 # DOWNLOAD
 def download_file(file_path, download_folder_path):
     global client_socket
+    
     if not client_socket:
         print("No connection to server.")
         return
@@ -126,31 +127,36 @@ def download_file(file_path, download_folder_path):
         ack = client_socket.recv(1024).decode().strip()
         if ack != "OK":
             raise Exception("Failed to receive acknowledgment from server")
+        
+        # Confirm if file is available 
+        ack = client_socket.recv(1024).decode().strip()
+        if ack == "NOTFOUND":
+            print(f"Cannot find {file_path} from server")
+        else:
+            # Receive the number of chunks
+            num_chunks = int(client_socket.recv(1024).decode())
+            print(f"Num of chunks: {num_chunks}")
 
-        # Receive the number of chunks
-        num_chunks = int(client_socket.recv(1024).decode())
-        print(f"Num of chunks: {num_chunks}")
+            # Init list to store chunk paths and threads
+            chunk_paths = []
+            threads = []
+            with alive_bar(num_chunks, title="Downloading File") as bar:
+                for index in range(num_chunks):
+                    thread = threading.Thread(target=download_chunk, args=(file_path, client_socket, chunk_paths, download_folder_path, bar))
+                    threads.append(thread)
+                    thread.start()
 
-        # Init list to store chunk paths and threads
-        chunk_paths = []
-        threads = []
-        with alive_bar(num_chunks, title="Downloading File") as bar:
-            for index in range(num_chunks):
-                thread = threading.Thread(target=download_chunk, args=(file_path, client_socket, chunk_paths, download_folder_path, bar))
-                threads.append(thread)
-                thread.start()
+                # Wait for all threads finish
+                for thread in threads:
+                    thread.join()
 
-            # Wait for all threads finish
-            for thread in threads:
-                thread.join()
+            # Merge chunks if all were downloaded successfully
+            if None not in chunk_paths:
+                output_file = os.path.join(download_folder_path, os.path.basename(file_path))
+                merge_chunks(chunk_paths, output_file)
 
-        # Merge chunks if all were downloaded successfully
-        if None not in chunk_paths:
-            output_file = os.path.join(download_folder_path, os.path.basename(file_path))
-            merge_chunks(chunk_paths, output_file)
-
-            client_socket.send('OK'.encode())
-            print(f"File {file_path} downloaded successfully")
+                client_socket.send('OK'.encode())
+                print(f"File {file_path} downloaded successfully")
     except socket.error as E:
         print(f"Socket error: {E}")
     except Exception as E:

@@ -218,33 +218,40 @@ def receive_chunk(conn, socket_lock, chunk_paths, file_name, num_chunks):
 
 # Handle download request
 def handle_download(conn, file_name):
+    chunks = []  # Khởi tạo biến `chunks` để tránh lỗi
     try:
         # Get file path
         file_path = os.path.join(DATA_FOLDER, file_name)
         if not os.path.exists(file_path):
-            raise FileNotFoundError(f"File {file_name} not found")
-        
-        # Split file into chunk
-        chunks = split_file(file_path, CHUNK_SIZE)
-        num_chunks = len(chunks)
-        conn.sendall(f"{num_chunks}".encode())
-
-        # Send chunks to the client
-        threads = []
-        for index, chunk_path in enumerate(chunks):
-            thread = threading.Thread(target=send_chunk, args=(conn, index, chunk_path, num_chunks))
-            threads.append(thread)
-            thread.start()
-
-        for thread in threads:
-            thread.join()
-
-        # ACK for send all chunks
-        ack = conn.recv(10).decode().strip()
-        if ack != 'OK':
-            raise Exception("Failed to receive aknowledgment from client")
+            # Tell client file not found
+            conn.sendall(f"NOTFOUND".encode())
+            print(f"File {file_name} not found")
+            return
         else:
-            print(f"File {file_name} downloaded successfully")
+            # Confirm
+            conn.sendall(f"OK".encode())
+            
+            # Split file into chunk
+            chunks = split_file(file_path, CHUNK_SIZE)
+            num_chunks = len(chunks)
+            conn.sendall(f"{num_chunks}".encode())
+
+            # Send chunks to the client
+            threads = []
+            for index, chunk_path in enumerate(chunks):
+                thread = threading.Thread(target=send_chunk, args=(conn, index, chunk_path, num_chunks))
+                threads.append(thread)
+                thread.start()
+
+            for thread in threads:
+                thread.join()
+
+            # ACK for send all chunks
+            ack = conn.recv(10).decode().strip()
+            if ack != 'OK':
+                raise Exception("Failed to receive acknowledgment from client")
+            else:
+                print(f"File {file_name} downloaded successfully")
 
     except Exception as E:
         print(f"Error handling download: {E}")
@@ -253,6 +260,7 @@ def handle_download(conn, file_name):
         for chunk in chunks:
             if os.path.exists(chunk):
                 os.remove(chunk)
+
 def send_chunk(conn, chunk_index, chunk_path, num_chunks):
     try:
         with socket_lock:
