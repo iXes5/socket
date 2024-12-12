@@ -389,8 +389,6 @@ def show_secondary_window():
            command=lambda: disconnect_to_server(secondary_window)).grid(row=0, column=2, padx=10)
     disconnect_image.image = disconnect_image
 
-    secondary_window.mainloop()
-
 def main():
     # Initialize the Tkinter menu window
     global menu
