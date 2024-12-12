@@ -5,7 +5,7 @@ import threading
 # IP loopback (use for test)
 HOST ='127.0.0.1'
 PORT = 55555
-CHUNK_SIZE = 1024*64
+CHUNK_SIZE = 1024
 DATA_FOLDER = 'server_data'
 DATA_ACCOUNT = 'account_data/account_info.txt'
 socket_lock = threading.Lock()
