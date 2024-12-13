@@ -209,9 +209,9 @@ def select_file_to_upload():
         else:
             print("No file selected to up looad.")
     
-def select_file_to_download(menu):
+def select_file_to_download(root):
     # Open window to enter file name
-    file_paths = open_file_input_dialog(menu)
+    file_paths = open_file_input_dialog(root)
 
     # Open dialog to choose destination of downLoad folder
     download_folder_path = filedialog.askdirectory()
@@ -308,7 +308,7 @@ def disconnect_to_server(secondary_window):
     secondary_window.destroy()
 
 # Open a window to enter file name
-def open_file_input_dialog(menu):
+def open_file_input_dialog(root):
     def add_file_name():
         file_name = entry.get().strip()
         if file_name:
@@ -334,7 +334,7 @@ def open_file_input_dialog(menu):
         dialog.destroy()
 
     # Create child window
-    dialog = tk.Toplevel(menu)
+    dialog = tk.Toplevel(root)
     dialog.title("Enter file name")
     dialog.geometry("300x300+600+150")
     dialog.resizable(False, False)
@@ -365,11 +365,11 @@ def open_file_input_dialog(menu):
     dialog.wait_window()
     return result_var.get().strip().split(", ")  # Ensure list is correctly formatted
 
-# Show main menu
+# Show main root
 def show_secondary_window():
-    secondary_window = tk.Toplevel(menu)
-    secondary_window.title("Main Menu")
-    secondary_window.geometry("500x250+500+200")
+    secondary_window = tk.Toplevel(root)
+    secondary_window.title("Main root")
+    secondary_window.geometry("500x240+500+200")
     secondary_window.configure(bg="linen")
     secondary_window.resizable(False, False)
 
@@ -386,7 +386,7 @@ def show_secondary_window():
     # Download button
     download_image = PhotoImage(file="image/download.png")
     Button(button_frame, image=download_image, bg="linen", bd=0,
-           command=lambda: select_file_to_download(menu)).grid(row=0, column=1, padx=10)
+           command=lambda: select_file_to_download(root)).grid(row=0, column=1, padx=10)
     download_image.image = download_image
 
     # Disconnect button
@@ -398,46 +398,69 @@ def show_secondary_window():
     secondary_window.mainloop()
 
 def main():
-    # Initialize the Tkinter menu window
-    global menu
-    menu = Tk()
-    menu.title("File Transfer Application")
-    screen_width = menu.winfo_screenwidth()
-    screen_height = menu.winfo_screenheight()
-    place_x = int((screen_width - 400) / 2)
-    place_y = int((screen_height - 300) / 2)
-    menu.geometry(f"400x300+{place_x}+{place_y}")
-    menu.configure(bg="linen")
-    menu.resizable(False, False)
+    # Initialize the Tkinter root window
+    global root
+    root = Tk()
+    root.title("File Transfer Application")
+    root.geometry(f"925x500+300+150")
+    root.configure(bg="#fff")
+    root.resizable(False, False)
 
-    # Title
-    title_label = Label(menu, text="Welcome back", font=("Helvetica", 16, "bold"), bg="linen", fg="black")
-    title_label.pack(pady=20)
+    # Background image
+    img = PhotoImage(file='image/login.png')
+    Label(root, image=img, bg='white').place(x=50, y=50)
 
-    # Frame contain widget
-    login_frame = Frame(menu, bg="linen")
-    login_frame.pack(expand=False, pady=15)
+    frame = Frame(root, width=350, height=350, bg='white')
+    frame.place(x=480, y=70)
 
-    # Username
-    Label(login_frame, text="Username:", bg="linen").grid(row=0, column=0, padx=5, pady=5, sticky="e")
-    username_entry = Entry(login_frame)
-    username_entry.grid(row=0, column=1, padx=5, pady=5)
+    heading = Label(frame, text='Login', fg='#57a1f8', bg='white', font=('Microsoft Yahei UI Light', 23, 'bold'))
+    heading.place(x=130, y=5)
 
-    # Password
-    Label(login_frame, text="Password:", bg="linen").grid(row=1, column=0, padx=5, pady=5, sticky="e")
-    password_entry = Entry(login_frame, show="*")
-    password_entry.grid(row=1, column=1, padx=5, pady=5)
+    def un_enter(e):
+        name = username.get()
+        if name == 'Username':
+            username.delete(0, 'end')
 
-    # Login button
-    Button(login_frame, text="Login",
-        command=lambda: login_account(username_entry.get(), password_entry.get()), bg="linen").grid(row=2, column=0, padx=5, pady=10)
+    def un_leave(e):
+        name = username.get()
+        if name == '':
+            username.insert(0, 'Username')
+
+    # Username box
+    username = Entry(frame, width=25, fg='black', border=0, bg='white', font=('Microsoft, YaHei UI Light', 11))
+    username.place(x=30, y=80)
+    username.insert(0, 'Username')
+    username.bind('<FocusIn>', un_enter)
+    username.bind('<FocusOut>', un_leave)
+
+    Frame(frame, width=295, height=2, bg='black').place(x=25, y=107)
+
+    def pw_enter(e):
+        name = password.get()
+        if name == 'Password':
+            password.delete(0, 'end')
+
+    def pw_leave(e):
+        name = password.get()
+        if name == '':
+            password.insert(0, 'Password')
+
+    # Password boxbox
+    password = Entry(frame, width=25, fg='black', border=00, bg='white', font=('Microsoft, YaHei UI Light', 11))
+    password.place(x=30, y=150)
+    password.insert(0, 'Password')
+    password.bind('<FocusIn>', pw_enter)
+    password.bind('<FocusOut>', pw_leave)
+
+    Frame(frame, width=295, height=2, bg='black').place(x=25, y=177)
+
+    Button(frame, width=39, pady=7, text='Login', bg='#57a1f8', fg='white', border=0,
+           command=lambda: login_account(username.get(), password.get())).place(x=35, y=220)
     
-    # Register button
-    Button(login_frame, text="Register",
-        command=lambda: register_account(username_entry.get(), password_entry.get()), bg="linen").grid(row=2, column=1, padx=5, pady=10)
+    Button(frame, width=39, pady=7, text='Register', bg='#67b99a', fg='white', border=0,
+           command=lambda: register_account(username.get(), password.get())).place(x=35, y=260)
 
-    # Main loop
-    menu.mainloop()
+    root.mainloop()
 
 if __name__ == "__main__":
     main()
